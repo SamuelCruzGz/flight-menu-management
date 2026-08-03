@@ -1,5 +1,5 @@
 from sqlalchemy import ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
@@ -49,3 +49,6 @@ class Dish(Base):
         nullable=False,        
     )
     
+    menu: Mapped["Menu"] = relationship(
+        back_populates="dishes",
+    )

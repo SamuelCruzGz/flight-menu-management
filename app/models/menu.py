@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from sqlalchemy import ForeignKey, String, func, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
@@ -50,4 +50,14 @@ class Menu(Base):
 
     deleted_at: Mapped[datetime | None] = mapped_column(
         nullable=True,
+    )
+    
+    dishes: Mapped[list["Dish"]] = relationship(
+        back_populates="menu",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    
+    flight: Mapped["Flight"] = relationship(
+        back_populates="menus",
     )
