@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -15,6 +17,7 @@ from app.repositories.flight import FlightRepository
 from app.repositories.menu import MenuRepository
 from app.models.dish import Dish
 from app.filters.menu import MenuFilter
+from app.schemas.dish import DishCreateRequest
 from app.schemas.common import (
     FlightNumber,
     MenuCycle,
@@ -22,6 +25,8 @@ from app.schemas.common import (
 )
 from app.schemas.menu import (
     MenuCreateRequest,
+    MenuUpdateRequest,
+    MenuSearchRequest,
     MenuResponse,
     PaginatedMenuResponse,
 )
@@ -37,38 +42,6 @@ class MenuService:
         self.menu_repository = menu_repository
         self.flight_repository = flight_repository
         self.db = db
-        
-        
-    def list(
-        self,
-        page_number: int,
-        page_size: int,
-    ) -> PaginatedMenuResponse:
-        """
-        Retrieve a paginated list of menus.
-        """
-
-        filters = MenuFilter(
-            page_number=page_number,
-            page_size=page_size,
-        )
-
-        return self._search(
-            filters,
-        )
-        
-        
-    def get(
-        self,
-        menu_id: int,
-    ) -> MenuResponse:
-        """
-        Retrieve a menu by its identifier.
-        """
-
-        menu = self._resolve_menu(menu_id)
-
-        return self._build_response(menu)    
         
         
     def create(
@@ -121,6 +94,59 @@ class MenuService:
         return self._build_response(menu)
     
     
+    def get(
+        self,
+        menu_id: int,
+    ) -> MenuResponse:
+        """
+        Retrieve a menu by its identifier.
+        """
+
+        menu = self._resolve_menu(menu_id)
+
+        return self._build_response(menu)                    
+    
+    
+                
+    def list(
+        self,
+        page_number: int,
+        page_size: int,
+    ) -> PaginatedMenuResponse:
+        """
+        Retrieve a paginated list of menus.
+        """
+
+        return self.search(
+            MenuSearchRequest(
+                page_number=page_number,
+                page_size=page_size,
+            )
+        )
+        
+    
+    def search(
+        self,
+        request: MenuSearchRequest,
+        ) -> PaginatedMenuResponse:
+        """
+        Search menus using the provided filters.
+        """
+
+        filters = MenuFilter(
+            flight_number=request.flight_number,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            status=request.status,
+            page_number=request.page_number,
+            page_size=request.page_size,
+        )
+
+        return self._search(
+            filters,
+        )
+        
+    
     def delete(
         self,
         menu_id: int,
@@ -141,6 +167,65 @@ class MenuService:
         except Exception:
             self.db.rollback()
             raise
+
+
+    def update(
+        self,
+        menu_id: int,
+        request: MenuUpdateRequest,
+    ) -> MenuResponse:
+        """
+        Update an existing menu.
+        """
+
+        menu = self._resolve_menu(
+            menu_id,
+        )
+
+        validate_duplicate_dishes(
+            request.dishes,
+        )
+
+        cycle = self._normalize_cycle(
+            request.cycle,
+        )
+
+        status = self._calculate_status(
+            request.start_date,
+            request.end_date,
+        )
+
+        self._validate_duplicate_menu(
+            flight_id=menu.flight_id,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            exclude_menu_id=menu.id,
+        )
+
+        menu.start_date = request.start_date
+        menu.end_date = request.end_date
+        menu.cycle = cycle
+        menu.status = status
+
+        self._replace_dishes(
+            menu,
+            request.dishes,
+        )
+
+        try:
+            menu = self.menu_repository.update(
+                menu,
+            )
+
+            self.db.commit()
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return self._build_response(
+            menu,
+        )
 
 
     def _resolve_flight(
@@ -201,7 +286,7 @@ class MenuService:
     def _search(
         self,
         filters: MenuFilter,
-    ) -> PaginatedMenuResponse:
+        ) -> PaginatedMenuResponse:
         """
         Execute a paginated menu search.
         """
@@ -228,7 +313,7 @@ class MenuService:
             page_number=filters.page_number,
             page_size=filters.page_size,
         )
-    
+
 
     def _normalize_cycle(
         self,
@@ -258,22 +343,12 @@ class MenuService:
             end_date=request.end_date,
             cycle=cycle,
             status=status,
-            created_by="system",  # TODO: Replace with authenticated user.
+            created_by="system",  
         )
 
-        menu.dishes = [
-            Dish(
-                meal_code=dish.meal_code,
-                name_es=dish.name_es,
-                name_en=dish.name_en,
-                description_es=dish.description_es,
-                description_en=dish.description_en,
-                image_url=str(dish.image_url),
-                availability=dish.availability,
-            )
-            for dish in request.dishes
-        ]
-
+        menu.dishes = self._build_dishes(
+            request.dishes,
+        )
         return menu
         
         
@@ -303,6 +378,7 @@ class MenuService:
         flight_id: int,
         start_date: date,
         end_date: date,
+        exclude_menu_id: int | None = None,
     ) -> None:
         """
         Ensure there is no duplicated menu for the same
@@ -313,7 +389,46 @@ class MenuService:
             flight_id=flight_id,
             start_date=start_date,
             end_date=end_date,
+            exclude_menu_id=exclude_menu_id,
         ):
             raise DuplicateMenuException()
-        
     
+
+    def _build_dishes(
+        self,
+        dishes: list[DishCreateRequest],
+    ) -> list[Dish]:
+        """
+        Build Dish entities from the request.
+        """
+
+        return [
+            Dish(
+                meal_code=dish.meal_code,
+                name_es=dish.name_es,
+                name_en=dish.name_en,
+                description_es=dish.description_es,
+                description_en=dish.description_en,
+                image_url=str(dish.image_url),
+                availability=dish.availability,
+            )
+            for dish in dishes
+        ]
+        
+        
+    def _replace_dishes(
+        self,
+        menu: Menu,
+        dishes: list[DishCreateRequest],
+    ) -> None:
+        """
+        Replace all dishes associated with a menu.
+        """
+
+        menu.dishes.clear()
+
+        menu.dishes.extend(
+            self._build_dishes(
+                dishes,
+            )
+        )

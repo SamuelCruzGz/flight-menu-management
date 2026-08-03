@@ -44,7 +44,11 @@ class MenuUpdateRequest(MenuBase):
         min_length=1,
     )
 
+
 class MenuSearchRequest(BaseModel):
+    """
+    Search criteria for paginated menu queries.
+    """
 
     flight_number: FlightNumber | None = None
 
@@ -54,9 +58,16 @@ class MenuSearchRequest(BaseModel):
 
     status: MenuStatus | None = None
 
-    page_number: int = 1
+    page_number: int = Field(
+        default=1,
+        ge=1,
+    )
 
-    page_size: int = 20
+    page_size: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+    )
 
 
 class MenuResponse(BaseModel):

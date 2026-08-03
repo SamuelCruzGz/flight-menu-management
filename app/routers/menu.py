@@ -3,9 +3,11 @@ from fastapi import APIRouter, Depends, Query, status
 from app.dependencies.menu import get_menu_service
 from app.schemas.menu import (
     MenuCreateRequest,
+    MenuUpdateRequest,
+    MenuSearchRequest,
     MenuResponse,
-    MenuDetailResponse,
     PaginatedMenuResponse,
+    MenuDetailResponse,
 )
 from app.services.menu import MenuService
 
@@ -47,7 +49,7 @@ def list_menus(
 @router.post(
     "",
     response_model=MenuResponse,
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
 )
 def create_menu(
     request: MenuCreateRequest,
@@ -60,18 +62,29 @@ def create_menu(
     return service.create(request)
 
 
+@router.post(
+    "/search",
+    response_model=PaginatedMenuResponse,
+)
+def search_menus(
+    request: MenuSearchRequest,
+    service: MenuService = Depends(get_menu_service),
+) -> PaginatedMenuResponse:
+    """
+    Search menus using multiple filters.
+    """
+
+    return service.search(request)
+
+
 @router.get(
     "/{menu_id}",
-    response_model=MenuResponse,
+    response_model=MenuDetailResponse,
 )
 def get_menu(
     menu_id: int,
     service: MenuService = Depends(get_menu_service),
-) -> MenuResponse:
-    """
-    Retrieve a menu by its identifier.
-    """
-
+) -> MenuDetailResponse:
     return service.get(menu_id)
 
 
@@ -81,12 +94,31 @@ def get_menu(
 )
 def delete_menu(
     menu_id: int,
-    service: MenuService = Depends(
-        get_menu_service,
-    ),
+    service: MenuService = Depends(get_menu_service),
 ) -> None:
     """
     Logically delete a menu.
     """
 
     service.delete(menu_id)
+    
+    
+@router.put(
+    "/{menu_id}",
+    response_model=MenuResponse,
+)
+def update_menu(
+    menu_id: int,
+    request: MenuUpdateRequest,
+    service: MenuService = Depends(
+        get_menu_service,
+    ),
+) -> MenuResponse:
+    """
+    Update an existing menu.
+    """
+
+    return service.update(
+        menu_id,
+        request,
+    )

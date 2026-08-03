@@ -178,7 +178,13 @@ class MenuRepository:
         flight_id: int,
         start_date: date,
         end_date: date,
+        exclude_menu_id: int | None = None,
     ) -> bool:
+        """
+        Check whether a menu already exists for the given
+        flight and date range.
+        """
+
         statement = (
             select(Menu.id)
             .where(
@@ -189,6 +195,13 @@ class MenuRepository:
             )
         )
 
-        result = self.db.execute(statement)
+        if exclude_menu_id is not None:
+            statement = statement.where(
+                Menu.id != exclude_menu_id,
+            )
+            
+        result = self.db.execute(
+            statement,
+        )
 
         return result.scalar_one_or_none() is not None

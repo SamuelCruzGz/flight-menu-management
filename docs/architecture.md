@@ -203,3 +203,25 @@ The application exposes two different endpoints with different use cases:
 - `POST /menus/search` provides advanced filtering.
 
 Both endpoints delegate filtering to the same repository implementation to avoid duplicating query logic and to guarantee consistent pagination and filtering behavior.
+
+## Menu Update Strategy
+
+### Decision
+
+The Menu entity is treated as the aggregate root.
+
+When updating a menu, the application updates the menu attributes while replacing the entire collection of dishes. Existing dishes are removed and recreated from the incoming request within the same transaction.
+
+The menu identity (`id`, `created_at`, and `created_by`) is preserved.
+
+### Reason
+
+Dish entities do not have an independent lifecycle and only exist as part of a Menu.
+
+Replacing the collection instead of synchronizing individual dishes:
+
+- Keeps the aggregate consistent.
+- Avoids complex comparison logic between existing and incoming dishes.
+- Reduces the chance of inconsistencies during updates.
+- Has negligible performance impact because each menu contains only a small number of dishes.
+- Preserves the identity and history of the Menu while reflecting the complete new state of its dishes.
