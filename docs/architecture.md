@@ -178,3 +178,13 @@ This approach keeps responsibilities separated:
 - Pydantic schemas validate API requests.
 - Filter objects transport search criteria between layers.
 - Repositories remain focused on persistence concerns.
+
+## Dependency Injection
+
+### Decision
+
+Services are instantiated through FastAPI dependency injection.
+
+### Reason
+
+Repositories and database sessions are created outside the business layer, allowing Services to remain independent from the web framework while keeping dependency construction centralized.

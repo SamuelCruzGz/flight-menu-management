@@ -1,9 +1,14 @@
+from collections.abc import Generator
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.database.config import settings
 
-engine = create_engine(settings.database_url)
+
+engine = create_engine(
+    settings.database_url,
+)
 
 SessionLocal = sessionmaker(
     bind=engine,
@@ -12,8 +17,9 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_db():
-    db: Session = SessionLocal()
+def get_db() -> Generator[Session, None, None]:
+
+    db = SessionLocal()
 
     try:
         yield db
