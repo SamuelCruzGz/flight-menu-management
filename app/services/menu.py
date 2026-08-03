@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.core.validation import validate_duplicate_dishes
 from app.exceptions.menu import (
-    DuplicateMenuException,
     FlightNotFoundException,
+    MenuNotFoundException,
+    DuplicateMenuException,
 )
 from app.models.flight import Flight
 from app.core.normalization import normalize_menu_cycle
@@ -13,6 +14,7 @@ from app.models.menu import Menu
 from app.repositories.flight import FlightRepository
 from app.repositories.menu import MenuRepository
 from app.models.dish import Dish
+from app.filters.menu import MenuFilter
 from app.schemas.common import (
     FlightNumber,
     MenuCycle,
@@ -21,8 +23,8 @@ from app.schemas.common import (
 from app.schemas.menu import (
     MenuCreateRequest,
     MenuResponse,
+    PaginatedMenuResponse,
 )
-
 
 class MenuService:
 
@@ -35,11 +37,47 @@ class MenuService:
         self.menu_repository = menu_repository
         self.flight_repository = flight_repository
         self.db = db
+        
+        
+    def list(
+        self,
+        page_number: int,
+        page_size: int,
+    ) -> PaginatedMenuResponse:
+        """
+        Retrieve a paginated list of menus.
+        """
 
+        filters = MenuFilter(
+            page_number=page_number,
+            page_size=page_size,
+        )
+
+        return self._search(
+            filters,
+        )
+        
+        
+    def get(
+        self,
+        menu_id: int,
+    ) -> MenuResponse:
+        """
+        Retrieve a menu by its identifier.
+        """
+
+        menu = self._resolve_menu(menu_id)
+
+        return self._build_response(menu)    
+        
+        
     def create(
         self,
         request: MenuCreateRequest,
     ) -> MenuResponse:
+        """
+        Create a menu and its associated dishes.
+        """
 
         cycle = self._normalize_cycle(
             request.cycle,
@@ -81,6 +119,29 @@ class MenuService:
             raise
 
         return self._build_response(menu)
+    
+    
+    def delete(
+        self,
+        menu_id: int,
+    ) -> None:
+        """
+        Logically delete a menu.
+        """
+
+        menu = self._resolve_menu(menu_id)
+
+        try:
+            self.menu_repository.soft_delete(
+                menu,
+            )
+
+            self.db.commit()
+
+        except Exception:
+            self.db.rollback()
+            raise
+
 
     def _resolve_flight(
         self,
@@ -102,6 +163,25 @@ class MenuService:
             raise FlightNotFoundException()
 
         return flight
+    
+    
+    def _resolve_menu(
+        self,
+        menu_id: int,
+    ) -> Menu:
+        """
+        Resolve a menu by its identifier.
+        """
+
+        menu = self.menu_repository.get_by_id(
+            menu_id,
+        )
+
+        if menu is None:
+            raise MenuNotFoundException()
+
+        return menu
+    
 
     def _calculate_status(
         self,
@@ -116,6 +196,39 @@ class MenuService:
             return MenuStatus.INACTIVE
 
         return MenuStatus.ACTIVE
+    
+    
+    def _search(
+        self,
+        filters: MenuFilter,
+    ) -> PaginatedMenuResponse:
+        """
+        Execute a paginated menu search.
+        """
+
+        menus = self.menu_repository.search(
+            filters,
+        )
+
+        total_records = self.menu_repository.count(
+            filters,
+        )
+
+        total_pages = (
+            total_records + filters.page_size - 1
+        ) // filters.page_size
+
+        return PaginatedMenuResponse(
+            items=[
+                self._build_response(menu)
+                for menu in menus
+            ],
+            total_records=total_records,
+            total_pages=total_pages,
+            page_number=filters.page_number,
+            page_size=filters.page_size,
+        )
+    
 
     def _normalize_cycle(
         self,
@@ -126,6 +239,7 @@ class MenuService:
         """
 
         return normalize_menu_cycle(cycle)
+
 
     def _create_menu(
         self,
@@ -161,6 +275,7 @@ class MenuService:
         ]
 
         return menu
+        
         
     def _build_response(
         self,
@@ -200,3 +315,5 @@ class MenuService:
             end_date=end_date,
         ):
             raise DuplicateMenuException()
+        
+    

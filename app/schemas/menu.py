@@ -44,8 +44,8 @@ class MenuUpdateRequest(MenuBase):
         min_length=1,
     )
 
-
 class MenuSearchRequest(BaseModel):
+
     flight_number: FlightNumber | None = None
 
     start_date: date | None = None
@@ -53,6 +53,10 @@ class MenuSearchRequest(BaseModel):
     end_date: date | None = None
 
     status: MenuStatus | None = None
+
+    page_number: int = 1
+
+    page_size: int = 20
 
 
 class MenuResponse(BaseModel):

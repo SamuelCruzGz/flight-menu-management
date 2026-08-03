@@ -188,3 +188,18 @@ Services are instantiated through FastAPI dependency injection.
 ### Reason
 
 Repositories and database sessions are created outside the business layer, allowing Services to remain independent from the web framework while keeping dependency construction centralized.
+
+## Search Strategy
+
+### Decision
+
+Menu listing and advanced search reuse the same repository filtering logic.
+
+### Reason
+
+The application exposes two different endpoints with different use cases:
+
+- `GET /menus` provides simple server-side pagination.
+- `POST /menus/search` provides advanced filtering.
+
+Both endpoints delegate filtering to the same repository implementation to avoid duplicating query logic and to guarantee consistent pagination and filtering behavior.
