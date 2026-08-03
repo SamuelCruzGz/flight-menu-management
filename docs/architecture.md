@@ -128,6 +128,7 @@ The service layer is responsible for resolving the corresponding `flight_id` bef
 ### Decision
 
 User input is normalized in the service layer before being persisted.
+Normalization is considered a technical concern and is isolated from the business domain.
 
 ### Reason
 

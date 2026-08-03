@@ -30,3 +30,22 @@ class FlightRepository:
             self.db.execute(statement)
             .scalar_one_or_none()
         )
+        
+    def get_by_flight_number(
+        self,
+        flight_number: FlightNumber,
+    ) -> Flight | None:
+        """
+        Retrieve a flight using its business identifier.
+        """
+
+        statement = (
+            select(Flight)
+            .where(
+                Flight.flight_number == flight_number,
+            )
+        )
+
+        result = self.db.execute(statement)
+
+        return result.scalar_one_or_none()
