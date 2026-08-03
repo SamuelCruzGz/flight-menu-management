@@ -3,7 +3,10 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core.validation import validate_duplicate_dishes
-from app.exceptions.menu import FlightNotFoundException
+from app.exceptions.menu import (
+    DuplicateMenuException,
+    FlightNotFoundException,
+)
 from app.models.flight import Flight
 from app.core.normalization import normalize_menu_cycle
 from app.models.menu import Menu
@@ -53,6 +56,12 @@ class MenuService:
 
         validate_duplicate_dishes(
             request.dishes,
+        )
+        
+        self._validate_duplicate_menu(
+            flight.id,
+            request.start_date,
+            request.end_date,
         )
 
         menu = self._create_menu(
@@ -172,3 +181,22 @@ class MenuService:
             created_at=menu.created_at,
             deleted_at=menu.deleted_at,
         )
+        
+    
+    def _validate_duplicate_menu(
+        self,
+        flight_id: int,
+        start_date: date,
+        end_date: date,
+    ) -> None:
+        """
+        Ensure there is no duplicated menu for the same
+        flight and date range.
+        """
+
+        if self.menu_repository.exists(
+            flight_id=flight_id,
+            start_date=start_date,
+            end_date=end_date,
+        ):
+            raise DuplicateMenuException()

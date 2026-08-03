@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.filters.menu import MenuFilter
 from app.models.flight import Flight
 from app.models.menu import Menu
-
+from datetime import date
 
 class MenuRepository:
 
@@ -112,3 +112,24 @@ class MenuRepository:
         result = self.db.execute(statement)
 
         return result.scalars().all()
+    
+    
+    def exists(
+        self,
+        flight_id: int,
+        start_date: date,
+        end_date: date,
+    ) -> bool:
+        statement = (
+        select(Menu.id)
+            .where(
+                Menu.flight_id == flight_id,
+                Menu.start_date == start_date,
+                Menu.end_date == end_date,
+                Menu.deleted_at.is_(None),
+            )
+        )
+
+        result = self.db.execute(statement)
+
+        return result.scalar_one_or_none() is not None

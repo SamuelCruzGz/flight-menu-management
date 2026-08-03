@@ -26,3 +26,10 @@ class DuplicateDishException(ConflictException):
     default_message = (
         "Duplicated dishes are not allowed within the same menu."
     )
+    
+class DuplicateMenuException(
+    ConflictException,
+):
+    default_message = (
+        "A menu already exists for the specified flight and date range."
+    )

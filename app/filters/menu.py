@@ -1,114 +1,23 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from dataclasses import dataclass
+from datetime import date
 
-from app.filters.menu import MenuFilters
-from app.models.flight import Flight
-from app.models.menu import Menu
+from app.schemas.common import (
+    FlightNumber,
+    MenuStatus,
+)
 
 
-class MenuRepository:
+@dataclass(slots=True)
+class MenuFilter:
 
-    def __init__(
-        self,
-        db: Session,
-    ):
-        self.db = db
+    flight_number: FlightNumber | None = None
 
-    def create(
-        self,
-        menu: Menu,
-    ) -> Menu:
+    start_date: date | None = None
 
-        self.db.add(menu)
+    end_date: date | None = None
 
-        self.db.flush()
+    status: MenuStatus | None = None
 
-        self.db.refresh(menu)
+    page_number: int = 1
 
-        return menu
-
-    def get_by_id(
-        self,
-        menu_id: int,
-    ) -> Menu | None:
-
-        statement = (
-            select(Menu)
-            .where(
-                Menu.id == menu_id,
-                Menu.deleted_at.is_(None),
-            )
-        )
-
-        result = self.db.execute(statement)
-
-        return result.scalar_one_or_none()
-
-    def update(
-        self,
-        menu: Menu,
-    ) -> Menu:
-
-        self.db.flush()
-
-        self.db.refresh(menu)
-
-        return menu
-
-    def soft_delete(
-        self,
-        menu: Menu,
-    ) -> None:
-
-        self.db.flush()
-
-    def search(
-        self,
-        filters: MenuFilters,
-    ) -> list[Menu]:
-
-        statement = (
-            select(Menu)
-            .join(Menu.flight)
-            .where(
-                Menu.deleted_at.is_(None),
-            )
-        )
-
-        if filters.flight_number is not None:
-            statement = statement.where(
-                Flight.flight_number == filters.flight_number,
-            )
-
-        if filters.start_date is not None:
-            statement = statement.where(
-                Menu.start_date >= filters.start_date,
-            )
-
-        if filters.end_date is not None:
-            statement = statement.where(
-                Menu.end_date <= filters.end_date,
-            )
-
-        if filters.status is not None:
-            statement = statement.where(
-                Menu.status == filters.status,
-            )
-
-        statement = statement.order_by(
-            Menu.created_at.desc(),
-        )
-
-        offset = (
-            filters.page_number - 1
-        ) * filters.page_size
-
-        statement = (
-            statement
-            .offset(offset)
-            .limit(filters.page_size)
-        )
-
-        result = self.db.execute(statement)
-
-        return result.scalars().all()
+    page_size: int = 20
