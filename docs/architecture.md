@@ -10,7 +10,7 @@ Its purpose is to explain **why** specific design choices were made, complementi
 
 Flight represents a flight route, not a flight execution.
 
-### Rationale
+### Reason
 
 The provided model does not include a departure date. Therefore, Flight is modeled as a reusable route that can have multiple menus over time.
 
@@ -24,7 +24,7 @@ The provided model does not include a departure date. Therefore, Flight is model
 
 Cycle represents the menu rotation cycle.
 
-#### Rationale
+#### Reason
 
 Using Breakfast/Lunch/Dinner would duplicate the responsibility already handled by `Dish.meal_code`.
 
@@ -32,11 +32,12 @@ Using Breakfast/Lunch/Dinner would duplicate the responsibility already handled 
 
 #### Decision
 
-Status represents the administrative state of the menu (`ACTIVE` / `INACTIVE`).
+Menu status is managed by the application and is never provided by API consumers.
 
-#### Rationale
+#### Reason
 
-Temporal states such as `FINISHED` can be derived from `start_date` and `end_date`, therefore they should not be persisted.
+The application determines the correct status based on business rules, preventing inconsistent states from being introduced by client requests.
+The calculated status is exposed in API responses and can be used as a search filter.
 
 ---
 
@@ -48,7 +49,7 @@ Temporal states such as `FINISHED` can be derived from `start_date` and `end_dat
 
 A Dish belongs to a Menu and is created as part of the menu creation process.
 
-#### Rationale
+#### Reason
 
 The proposed data model defines a direct relationship through `menu_id` and does not include a reusable dish catalog.
 
@@ -64,8 +65,72 @@ As a consequence:
 
 Dish names are normalized only during validation.
 
-#### Rationale
+#### Reason
 
 Formatting differences such as uppercase letters, extra spaces or underscores should not create duplicate dishes within the same menu.
 
 The normalized value is used only during validation and is never persisted in the database.
+
+## Soft Delete
+
+### Decision
+
+Menus are logically deleted using the `deleted_at` column instead of performing a physical deletion.
+
+### Reason
+
+The technical assessment explicitly requires soft deletion.
+
+This approach preserves historical information, enables auditing, and prevents accidental data loss.
+
+Active menus are identified by `deleted_at IS NULL`.
+
+## Database Constraints
+
+### Decision
+
+Business rules such as preventing duplicated menus for the same flight and date range are enforced at the database level using `UniqueConstraint`.
+
+### Reason
+
+The Service layer performs friendly validation, while the database guarantees data integrity regardless of the application layer.
+
+## API Schemas
+
+### Decision
+
+Database models and API schemas are intentionally separated.
+
+### Reason
+
+SQLAlchemy models represent persistence.
+
+Pydantic schemas represent the API contract.
+
+Keeping both layers independent allows different request and response contracts without coupling them to the database structure.
+
+## Flight Identifier
+
+### Decision
+
+The API uses `flight_number` instead of the internal `flight_id` in request payloads whenever the client needs to identify a flight.
+
+### Reason
+
+`flight_number` is a business identifier known by API consumers, while `flight_id` is an internal database identifier.
+
+Keeping `flight_id` internal reduces coupling between clients and the persistence layer, resulting in a more stable API contract.
+
+The service layer is responsible for resolving the corresponding `flight_id` before interacting with the repository.
+
+## Input Normalization
+
+### Decision
+
+User input is normalized in the service layer before being persisted.
+
+### Reason
+
+API consumers may provide equivalent values using different languages or formats (e.g. `week_1`, `Week_1`, `semana_1`).
+
+The service layer converts those values into a single canonical representation before interacting with the repository, while the database stores only normalized values.
