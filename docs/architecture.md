@@ -134,3 +134,46 @@ User input is normalized in the service layer before being persisted.
 API consumers may provide equivalent values using different languages or formats (e.g. `week_1`, `Week_1`, `semana_1`).
 
 The service layer converts those values into a single canonical representation before interacting with the repository, while the database stores only normalized values.
+
+## Validation Strategy
+
+### Decision
+
+Request consistency is validated in the Service layer whenever it can be determined without accessing the database.
+
+Database constraints are reserved for enforcing persistence integrity.
+
+### Reason
+
+Avoiding unnecessary database queries improves performance while keeping the database as the final authority for data integrity.
+
+
+## Transaction Management
+
+### Decision
+
+Repositories never commit or rollback transactions.
+
+Transaction boundaries are managed by the Service layer.
+
+### Reason
+
+A single business operation may involve multiple repositories.
+
+Managing the transaction in the Service layer guarantees that all persistence operations succeed or fail as a single unit of work.
+
+## Repository Filters
+
+### Decision
+
+Repositories receive dedicated filter objects instead of API schemas or long parameter lists.
+
+### Reason
+
+Filter objects keep repositories independent from the API layer while providing a scalable way to extend search criteria without continuously changing repository method signatures.
+
+This approach keeps responsibilities separated:
+
+- Pydantic schemas validate API requests.
+- Filter objects transport search criteria between layers.
+- Repositories remain focused on persistence concerns.
